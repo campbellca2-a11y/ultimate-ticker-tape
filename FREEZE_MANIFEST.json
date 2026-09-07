@@ -1,0 +1,191 @@
+{
+  "schema_version": 1,
+  "freeze_date": "2026-09-07",
+  "repository": "campbellca2-a11y/ultimate-ticker-tape",
+  "branch": "freeze/v4.4.0-known-good",
+  "parent_commit": "c1bc661c2defb1050392c33a49331920ce3e8ad5",
+  "selected_build": "SpaceArt_UltimateTicker_v4.4.0.html",
+  "selection_basis": "Bill explicitly identified v4.4 as the smoothest build; no new comparative performance claim.",
+  "scope": "Exact HTML bytes; live feeds, remote services and browser settings are not frozen.",
+  "verified_sources": {
+    "v4.4.0": "Two prior workspace copies and Library libfile_226493438d5c8191bd3aa484e6205d31 have identical SHA-256.",
+    "v3.4": "Prior workspace copy and Library libfile_d55c801444648191bf8841b84541a315 have identical SHA-256. Drive filename and size match; Drive bytes not independently compared.",
+    "v3.3": "Git blob SHA matches main/index (3).html exactly."
+  },
+  "files": [
+    {
+      "path": "archive/classic/Ultimate_Ticker_Tape_v3.0_DuckWalk.html",
+      "original_filename": "Ultimate_Ticker_Tape_v3.0_DuckWalk.html",
+      "bytes": 82641,
+      "sha256": "a987cc4337ac1c1fb45a96e429116ace51589e58770522ca972e69e0eab42ec6",
+      "git_blob_sha": "607e66a48d88eb610071b823a0b40c9cb5b25174",
+      "status": "historical build; preserved",
+      "source": "Recovered prior ChatGPT workspace artifact",
+      "source_path": "/workspace/scratch/bc0bdbb0896b/ultimate-ticker-tape-v3/Ultimate_Ticker_Tape_v3.0_DuckWalk.html"
+    },
+    {
+      "path": "archive/classic/Ultimate_Ticker_Tape_v3.1_DuckWalk.html",
+      "original_filename": "Ultimate_Ticker_Tape_v3.1_DuckWalk.html",
+      "bytes": 3242880,
+      "sha256": "7a19c27ca4f7312232cb215a1a325a1c1bfacd5a6be4560e9e4ee8a0a4365089",
+      "git_blob_sha": "54754908a654e4d060db72869ef1e831160a58e4",
+      "status": "historical build; preserved",
+      "source": "Recovered prior ChatGPT workspace artifact",
+      "source_path": "/workspace/scratch/bc0bdbb0896b/ultimate-ticker-tape-v3.1/Ultimate_Ticker_Tape_v3.1_DuckWalk.html"
+    },
+    {
+      "path": "archive/classic/Ultimate_Ticker_Tape_v3.2_DuckWalk.html",
+      "original_filename": "Ultimate_Ticker_Tape_v3.2_DuckWalk.html",
+      "bytes": 3255678,
+      "sha256": "66cdbe6e15598539eeedc04b36b9f049e3bb2bae145667f354ca09ecb303f3dc",
+      "git_blob_sha": "f618b340f81bb9d955b2cd61faf77907d89ad1dd",
+      "status": "historical build; preserved",
+      "source": "Recovered prior ChatGPT workspace artifact",
+      "source_path": "/workspace/scratch/bc0bdbb0896b/ultimate-ticker-tape-v3.2/Ultimate_Ticker_Tape_v3.2_DuckWalk.html"
+    },
+    {
+      "path": "archive/classic/Ultimate_Ticker_Tape_v3.3_DuckWalk.html",
+      "original_filename": "Ultimate_Ticker_Tape_v3.3_DuckWalk.html",
+      "bytes": 3253966,
+      "sha256": "02923481d7807fa2c81911513f2c22fab99ae356dda71389ab49119075acfc92",
+      "git_blob_sha": "428b80ead71c88e5cc7e802a3970e63a42410b15",
+      "status": "historical build; preserved",
+      "source": "Recovered prior ChatGPT workspace artifact",
+      "source_path": "/workspace/scratch/bc0bdbb0896b/ultimate-ticker-tape-v3.3/Ultimate_Ticker_Tape_v3.3_DuckWalk.html"
+    },
+    {
+      "path": "archive/classic/Ultimate_Ticker_Tape_v3.4_DuckWalk.html",
+      "original_filename": "Ultimate_Ticker_Tape_v3.4_DuckWalk.html",
+      "bytes": 3267211,
+      "sha256": "2875fbaa636903016382bfbcc1561b67c08abf04f0bb6406bbc6958f9947efb5",
+      "git_blob_sha": "9aa97900dda1ae7cdf94a629b9657c6d384da1a5",
+      "status": "historical build; preserved",
+      "source": "Recovered prior ChatGPT workspace artifact",
+      "source_path": "/workspace/scratch/bc0bdbb0896b/ultimate-ticker-tape-v3.4/Ultimate_Ticker_Tape_v3.4_DuckWalk.html"
+    },
+    {
+      "path": "archive/classic/Ultimate_Ticker_Tape_v3.5.1_Hardening_Edition.html",
+      "original_filename": "Ultimate_Ticker_Tape_v3.5.1_Hardening_Edition.html",
+      "bytes": 3296852,
+      "sha256": "575035aa19dd01758f6d3f1bad67efa09a60be291a89185b0a0e7dc30f6793ad",
+      "git_blob_sha": "b3939d2e9b5d6b5c0a830fd4985abe64e31cf16e",
+      "status": "historical build; preserved",
+      "source": "Recovered prior ChatGPT workspace artifact",
+      "source_path": "/workspace/scratch/3f6682b11a15/Ultimate_Ticker_Tape_v3.5.1_Hardening_Edition.html"
+    },
+    {
+      "path": "archive/classic/Ultimate_Ticker_Tape_v3.5_DuckWalk.html",
+      "original_filename": "Ultimate_Ticker_Tape_v3.5_DuckWalk.html",
+      "bytes": 3279911,
+      "sha256": "08d6e4376f440e55dcdc214027a496dde02de732f846fe760f9414d19e572303",
+      "git_blob_sha": "67c8ab1c8537cefcf9d6f4239452bb58f7681034",
+      "status": "historical build; preserved",
+      "source": "Recovered prior ChatGPT workspace artifact",
+      "source_path": "/workspace/scratch/3f6682b11a15/Ultimate_Ticker_Tape_v3.5_DuckWalk.html"
+    },
+    {
+      "path": "archive/spaceart/SpaceArt_UltimateTicker_v4.0.0.html",
+      "original_filename": "SpaceArt_UltimateTicker_v4.0.0.html",
+      "bytes": 3313756,
+      "sha256": "2b38e6ba8c544b91de15bfef8457ec7b558f9f8445dd81834bfc7fcaf0344e86",
+      "git_blob_sha": "6c8254ce8ba74b1ba0f88e630c7679f899d05068",
+      "status": "historical build; preserved",
+      "source": "Recovered prior ChatGPT workspace artifact",
+      "source_path": "/workspace/scratch/72777cde6092/SpaceArt_UltimateTicker_v4.0.0.html"
+    },
+    {
+      "path": "archive/spaceart/SpaceArt_UltimateTicker_v4.0.1.html",
+      "original_filename": "SpaceArt_UltimateTicker_v4.0.1.html",
+      "bytes": 3314270,
+      "sha256": "0c0477cb684a350eb5a55471421d2eae40c8efe341453a5ad1ddc7c907afad83",
+      "git_blob_sha": "a7f962ff5cb7ca312a7973fe3dbf2292a2469420",
+      "status": "historical build; preserved",
+      "source": "Recovered prior ChatGPT workspace artifact",
+      "source_path": "/workspace/scratch/72777cde6092/SpaceArt_UltimateTicker_v4.0.1.html"
+    },
+    {
+      "path": "archive/spaceart/SpaceArt_UltimateTicker_v4.1.0.html",
+      "original_filename": "SpaceArt_UltimateTicker_v4.1.0.html",
+      "bytes": 3315815,
+      "sha256": "3945e4d25811846a5a7b72e9caa09556e6e2dba2f25b1c4441428e10973d3367",
+      "git_blob_sha": "7f4bcb77dbe7eaaf97e1fc6d23cf563c8e585120",
+      "status": "historical build; preserved",
+      "source": "Recovered prior ChatGPT workspace artifact",
+      "source_path": "/workspace/scratch/72777cde6092/SpaceArt_UltimateTicker_v4.1.0.html"
+    },
+    {
+      "path": "archive/spaceart/SpaceArt_UltimateTicker_v4.2.0.html",
+      "original_filename": "SpaceArt_UltimateTicker_v4.2.0.html",
+      "bytes": 3317653,
+      "sha256": "36e081ab72ed52cecc5fc774df2eae85a32faa94a2e4ba47e1937f93bc0174a1",
+      "git_blob_sha": "2dfde9d8cfbf26b0ef4569bb87dcf2a6563026e1",
+      "status": "historical build; preserved",
+      "source": "Recovered prior ChatGPT workspace artifact",
+      "source_path": "/workspace/scratch/72777cde6092/SpaceArt_UltimateTicker_v4.2.0.html"
+    },
+    {
+      "path": "archive/spaceart/SpaceArt_UltimateTicker_v4.3.0.html",
+      "original_filename": "SpaceArt_UltimateTicker_v4.3.0.html",
+      "bytes": 3320669,
+      "sha256": "bdeb904ef73e8067355f333ea8da399c7e010a7da853cad3eaf6eb7d4316d8d9",
+      "git_blob_sha": "0789ee85ad76dd5a198836d3311dded2326f2fcb",
+      "status": "historical build; preserved",
+      "source": "Recovered prior ChatGPT workspace artifact",
+      "source_path": "/workspace/scratch/72777cde6092/SpaceArt_UltimateTicker_v4.3.0.html"
+    },
+    {
+      "path": "frozen/v4.4.0/SpaceArt_UltimateTicker_v4.4.0.html",
+      "original_filename": "SpaceArt_UltimateTicker_v4.4.0.html",
+      "bytes": 3323740,
+      "sha256": "5c975a1678ef4083639c54e0c043039fbb149d3877ac33495ea6a8fb14b76a0f",
+      "git_blob_sha": "d66ffb4e40390ed05779c4d1da4a8ff12ccdf5a1",
+      "status": "user-selected known-good baseline",
+      "source": "Recovered prior ChatGPT workspace artifact",
+      "source_path": "/workspace/scratch/72777cde6092/SpaceArt_UltimateTicker_v4.4.0.html"
+    },
+    {
+      "path": "archive/experiments/SpaceArt_UltimateTicker_v4.5.0.html",
+      "original_filename": "SpaceArt_UltimateTicker_v4.5.0.html",
+      "bytes": 3324216,
+      "sha256": "2700a8482d494750729d3e0f370e659f9d58ecdbe64a53ab2fa071d61d1f1f2d",
+      "git_blob_sha": "b50e942640bdb46c0a127007e9b604e18389d51d",
+      "status": "later experiment; not selected",
+      "source": "Recovered prior ChatGPT workspace artifact",
+      "source_path": "/workspace/scratch/72777cde6092/SpaceArt_UltimateTicker_v4.5.0.html"
+    },
+    {
+      "path": "archive/experiments/SpaceArt_UltimateTicker_v4.6.0.html",
+      "original_filename": "SpaceArt_UltimateTicker_v4.6.0.html",
+      "bytes": 3326084,
+      "sha256": "3896f232560600d0e0ab49b1c9b3eb953b5181e41d9f16e1ea019742a9f11170",
+      "git_blob_sha": "bbd9326f545cd0a4c5774c9f6ef19a8a2e1a6ab2",
+      "status": "later experiment; not selected",
+      "source": "Recovered prior ChatGPT workspace artifact",
+      "source_path": "/workspace/scratch/72777cde6092/SpaceArt_UltimateTicker_v4.6.0.html"
+    },
+    {
+      "path": "archive/experiments/SpaceArt_UltimateTicker_v4.4.1_OrbitStudy.html",
+      "original_filename": "SpaceArt_UltimateTicker_v4.4.1_OrbitStudy.html",
+      "bytes": 3326725,
+      "sha256": "50cc8eda3db4a5e0e7ae12a133691d042ef02f50bc5e98f595dc990fc8c9018a",
+      "git_blob_sha": "0f358ea6fce3ffd261dd59edf8bb9b0ea5fd58e8",
+      "status": "later experiment; not selected",
+      "source": "Recovered prior ChatGPT workspace artifact",
+      "source_path": "/workspace/scratch/182f17a8af67/SpaceArt_UltimateTicker_v4.4.1_OrbitStudy.html"
+    }
+  ],
+  "aliases": [
+    {
+      "path": "index.html",
+      "identical_to": "frozen/v4.4.0/SpaceArt_UltimateTicker_v4.4.0.html",
+      "sha256": "5c975a1678ef4083639c54e0c043039fbb149d3877ac33495ea6a8fb14b76a0f",
+      "git_blob_sha": "d66ffb4e40390ed05779c4d1da4a8ff12ccdf5a1"
+    },
+    {
+      "path": "index (3).html",
+      "identical_to": "archive/classic/Ultimate_Ticker_Tape_v3.3_DuckWalk.html",
+      "sha256": "02923481d7807fa2c81911513f2c22fab99ae356dda71389ab49119075acfc92",
+      "git_blob_sha": "428b80ead71c88e5cc7e802a3970e63a42410b15"
+    }
+  ]
+}

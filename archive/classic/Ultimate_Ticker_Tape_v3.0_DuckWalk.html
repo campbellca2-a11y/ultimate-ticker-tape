@@ -1,0 +1,1443 @@
+<!DOCTYPE html>
+<!--
+DUCKWALK PROVENANCE — 2026-09-04
+Discover:
+  P1 e14ca8d1… — self-contained multi-lane layout, local customization, sample fallback.
+  P2 80ef28b7… — live feeds, saved preferences, robust moving-item selection, detail drawer.
+  P3 7e8a417a… — compact single-strip presentation, hover pause, direct source intent.
+Uncover:
+  P2 is the functional spine; P1 supplies graceful degradation; P3 supplies compact focus.
+  Random charts and ambiguous LIVE status were visually persuasive but evidentially false.
+Connect:
+  This file combines the compatible strengths, preserves source URLs through the detail view,
+  labels live/cached/sample state, and remains a standalone browser file.
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A configurable, clickable live ticker for news, markets, weather, Reddit, entertainment, and sports.">
+    <title>Ultimate Ticker Tape v3.0</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0a0a0f;
+            color: #e0e0e0;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            overflow-x: hidden;
+            min-height: 100vh;
+            padding-bottom: 34px;
+        }
+        button, input, select { font: inherit; }
+        button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible {
+            outline: 3px solid #ffd166;
+            outline-offset: 3px;
+        }
+
+        /* ── Header ── */
+        .app-header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            padding: 16px 24px;
+            display: flex; align-items: center; justify-content: space-between;
+            border-bottom: 2px solid #e94560;
+            position: sticky; top: 0; z-index: 100;
+        }
+        .brand-block { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+        .app-header h1 {
+            font-size: 1.4rem; font-weight: 700;
+            background: linear-gradient(90deg, #e94560, #0f3460, #e94560);
+            background-size: 200% auto;
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            animation: shimmer 3s linear infinite;
+        }
+        .version-mark { color: #7c8494; font-size: 0.75rem; white-space: nowrap; }
+        @keyframes shimmer { to { background-position: 200% center; } }
+        .header-controls { display: flex; gap: 10px; align-items: center; }
+        .header-controls button {
+            background: #e94560; border: none; color: #fff;
+            padding: 8px 16px; border-radius: 6px; cursor: pointer;
+            font-size: 0.875rem; font-weight: 650; transition: all 0.2s;
+        }
+        .header-controls button:hover { background: #c73550; transform: scale(1.03); }
+        .header-controls button.secondary {
+            background: transparent; border: 1px solid #e94560; color: #e94560;
+        }
+        .speed-control { display: flex; align-items: center; gap: 8px; color: #b0b5c0; font-size: 0.875rem; }
+        .speed-control input[type=range] { width: 96px; accent-color: #e94560; }
+        .live-badge-header {
+            display: inline-flex; align-items: center; gap: 5px;
+            background: #1b5e20; color: #69f0ae; padding: 4px 10px;
+            border-radius: 12px; font-size: 0.7rem; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 1px;
+        }
+        .live-badge-header.offline { background: #4a1500; color: #ff6e40; }
+        .live-badge-header .dot {
+            width: 6px; height: 6px; border-radius: 50%; background: #69f0ae;
+            animation: pulse 1.5s infinite;
+        }
+        .live-badge-header.offline .dot { background: #ff6e40; }
+
+        /* ── Ticker Lanes ── */
+        .ticker-container { position: relative; width: 100%; }
+        .ticker-lane {
+            overflow: hidden; white-space: nowrap;
+            border-bottom: 1px solid #1a1a2e; position: relative;
+        }
+        .ticker-lane::before {
+            content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 60px;
+            background: linear-gradient(to right, #0a0a0f, transparent); z-index: 2; pointer-events: none;
+        }
+        .ticker-lane::after {
+            content: ''; position: absolute; right: 0; top: 0; bottom: 0; width: 60px;
+            background: linear-gradient(to left, #0a0a0f, transparent); z-index: 2; pointer-events: none;
+        }
+        .ticker-lane .label {
+            position: absolute; left: 8px; top: 50%; transform: translateY(-50%);
+            z-index: 3; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px;
+            color: #ff6b7f; background: #0a0a0f; padding: 3px 7px; border-radius: 3px;
+        }
+        .ticker-track {
+            display: inline-flex; align-items: center;
+            animation: scroll-left var(--speed, 30s) linear infinite; padding: 0;
+        }
+        .ticker-lane:hover .ticker-track { animation-play-state: paused !important; }
+        .ticker-lane:focus-within .ticker-track { animation-play-state: paused !important; }
+        .ticker-lane.force-paused .ticker-track { animation-play-state: paused !important; }
+        body.modal-open .ticker-track { animation-play-state: paused !important; }
+        @keyframes scroll-left { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+
+        /* ── Ticker Items ── */
+        .ticker-item {
+            display: inline-flex; align-items: center; gap: 10px;
+            padding: 10px 20px; margin: 6px 8px; background: #111;
+            border-radius: 8px; border: 1px solid #222; white-space: nowrap;
+            flex-shrink: 0; transition: all 0.2s; cursor: pointer;
+            max-width: 560px; user-select: none; touch-action: manipulation;
+            color: inherit; font-family: inherit; text-align: left;
+        }
+        .ticker-item:hover { border-color: #e94560; background: #1a1a2e; transform: scale(1.02); }
+        .ticker-item:active { transform: scale(0.98); }
+        .ticker-item .price-up { color: #00e676; font-weight: 700; }
+        .ticker-item .price-down { color: #ff1744; font-weight: 700; }
+        .ticker-item.stock .symbol { color: #fff; font-weight: 700; margin-right: 4px; }
+        .ticker-item.crypto .symbol { color: #f7931a; font-weight: 700; }
+        .ticker-item.news { border-left: 3px solid #ffd600; }
+        .ticker-item.news .source { color: #ffd600; font-weight: 600; font-size: 0.75rem; }
+        .ticker-item.reddit { border-left: 3px solid #ff4500; }
+        .ticker-item.reddit .subreddit { color: #ff4500; font-weight: 600; }
+        .ticker-item.gossip { border-left: 3px solid #e040fb; }
+        .ticker-item.gossip .source { color: #e040fb; font-weight: 600; font-size: 0.75rem; }
+        .ticker-item.weather { border-left: 3px solid #29b6f6; }
+        .ticker-item.sports-item { border-left: 3px solid #76ff03; }
+        .ticker-item.sports-item .source { color: #76ff03; font-weight: 600; font-size: 0.75rem; }
+        .ticker-item .emoji { font-size: 1.3rem; }
+        .ticker-item .text { font-size: 1rem; overflow: hidden; text-overflow: ellipsis; max-width: 360px; }
+        .ticker-item .meta { font-size: 0.8rem; color: #8a909d; }
+        .ticker-item .badge { font-size: 0.72rem; padding: 2px 7px; border-radius: 10px; font-weight: 700; text-transform: uppercase; }
+        .ticker-item .thumb { width: 44px; height: 30px; object-fit: cover; border-radius: 5px; background: #222; }
+        .ticker-item[data-readable="true"]::after {
+            content: attr(data-action); color: #9da5b4; font-size: 0.68rem; letter-spacing: 0.08em;
+            border: 1px solid #353a46; border-radius: 4px; padding: 2px 5px;
+        }
+        body.density-compact .ticker-item { padding: 6px 14px; margin: 4px 6px; }
+        body.density-compact .ticker-item .text { font-size: 0.9rem; }
+        body.density-compact .ticker-item .thumb { width: 36px; height: 24px; }
+        body.density-large .ticker-item { padding: 14px 24px; margin: 8px 10px; }
+        body.density-large .ticker-item .text { font-size: 1.12rem; max-width: 440px; }
+        body.density-large .ticker-item .thumb { width: 58px; height: 40px; }
+        .badge.live { background: #ff1744; color: #fff; animation: pulse 1.5s infinite; }
+        .badge.hot { background: #ff6d00; color: #fff; }
+        .badge.new { background: #00c853; color: #fff; }
+        .badge.trending { background: #aa00ff; color: #fff; }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+        /* ── Detail Panel ── */
+        .detail-overlay { display: none; position: fixed; inset: 0; z-index: 300; }
+        .detail-overlay.open { display: flex; }
+        .detail-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
+        .detail-panel {
+            position: absolute; right: 0; top: 0; bottom: 0; width: 520px; max-width: 95vw;
+            background: #111118; border-left: 2px solid #e94560; overflow-y: auto;
+            transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+            display: flex; flex-direction: column;
+        }
+        .detail-panel:focus { outline: none; }
+        .detail-overlay.open .detail-panel { transform: translateX(0); }
+        .detail-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 18px 22px; border-bottom: 1px solid #222;
+            background: #0d0d15; position: sticky; top: 0; z-index: 1;
+        }
+        .detail-header .detail-type {
+            font-size: 0.65rem; text-transform: uppercase; letter-spacing: 2px;
+            padding: 3px 10px; border-radius: 4px; font-weight: 700;
+        }
+        .detail-type.stock-type { background: #1b5e20; color: #69f0ae; }
+        .detail-type.crypto-type { background: #4a2800; color: #f7931a; }
+        .detail-type.news-type { background: #4a3f00; color: #ffd600; }
+        .detail-type.reddit-type { background: #4a1500; color: #ff4500; }
+        .detail-type.gossip-type { background: #3a004a; color: #e040fb; }
+        .detail-type.weather-type { background: #003a4a; color: #29b6f6; }
+        .detail-type.sports-type { background: #1a3a00; color: #76ff03; }
+        .detail-type.custom-type { background: #29233a; color: #c7a9ff; }
+        .detail-close {
+            background: none; border: 1px solid #333; color: #888;
+            width: 36px; height: 36px; border-radius: 8px; cursor: pointer;
+            font-size: 1.2rem; display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+        }
+        .detail-close:hover { border-color: #e94560; color: #e94560; }
+        .detail-body { padding: 22px; flex: 1; }
+        .detail-title { font-size: 1.3rem; font-weight: 700; line-height: 1.4; margin-bottom: 16px; color: #fff; }
+        .detail-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        .detail-stat { background: #1a1a2a; padding: 12px 14px; border-radius: 8px; border: 1px solid #222; }
+        .detail-stat .stat-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; color: #666; margin-bottom: 4px; }
+        .detail-stat .stat-value { font-size: 1.1rem; font-weight: 700; }
+        .detail-stat .stat-value.up { color: #00e676; }
+        .detail-stat .stat-value.down { color: #ff1744; }
+        .detail-section { margin-bottom: 20px; }
+        .detail-section h4 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1.5px; color: #666; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid #1a1a2a; }
+        .detail-description { font-size: 1rem; line-height: 1.65; color: #c7cad1; margin-bottom: 16px; }
+        .detail-chart {
+            background: #1a1a2a; border: 1px solid #222; border-radius: 8px; height: 160px;
+            display: flex; align-items: flex-end; justify-content: center; padding: 14px; gap: 3px;
+            margin-bottom: 16px; position: relative;
+        }
+        .detail-chart .chart-label { position: absolute; top: 8px; left: 12px; font-size: 0.65rem; color: #555; text-transform: uppercase; letter-spacing: 1px; }
+        .chart-bar { width: 8px; border-radius: 3px 3px 0 0; min-height: 4px; }
+        .detail-related { list-style: none; padding: 0; }
+        .detail-related li {
+            padding: 10px 12px; background: #1a1a2a; border-radius: 6px; margin-bottom: 6px;
+            font-size: 0.85rem; border-left: 3px solid #333; cursor: pointer; transition: all 0.2s;
+        }
+        .detail-related li:hover { border-left-color: #e94560; background: #222; }
+        .detail-related li .related-source { font-size: 0.7rem; color: #666; margin-top: 4px; }
+        .detail-actions {
+            padding: 18px 22px; border-top: 1px solid #222; background: #0d0d15;
+            display: flex; flex-wrap: wrap; gap: 8px; position: sticky; bottom: 0;
+        }
+        .detail-actions a, .detail-actions button {
+            display: inline-flex; align-items: center; gap: 6px; padding: 10px 16px;
+            border-radius: 8px; font-size: 0.875rem; font-weight: 650;
+            text-decoration: none; cursor: pointer; transition: all 0.2s; border: none;
+        }
+        .action-primary { background: #e94560; color: #fff; }
+        .action-primary:hover { background: #c73550; }
+        .action-secondary { background: #1a1a2a; color: #ccc; border: 1px solid #333 !important; }
+        .action-secondary:hover { border-color: #e94560 !important; color: #fff; }
+        .forecast-row { display: flex; gap: 8px; flex-wrap: wrap; }
+        .forecast-day { background: #1a1a2a; border: 1px solid #222; border-radius: 8px; padding: 10px; text-align: center; font-size: 0.75rem; flex: 1; min-width: 60px; }
+        .forecast-day .fc-emoji { font-size: 1.2rem; display: block; margin: 4px 0; }
+        .forecast-day .fc-temp { font-weight: 700; color: #fff; }
+        .forecast-day .fc-day { color: #666; }
+
+        /* ── Config Panel ── */
+        .config-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; justify-content: center; align-items: center; }
+        .config-overlay.open { display: flex; }
+        .config-panel {
+            background: #13131f; border: 1px solid #333; border-radius: 12px;
+            padding: 28px; width: 720px; max-height: 85vh; overflow-y: auto;
+        }
+        .config-panel h2 { color: #e94560; margin-bottom: 18px; font-size: 1.2rem; }
+        .config-panel h3 { color: #aaa; margin: 16px 0 8px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; }
+        .config-section { background: #1a1a2a; padding: 14px; border-radius: 8px; margin-bottom: 12px; }
+        .config-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+        .config-row label { font-size: 0.85rem; color: #bbb; min-width: 120px; }
+        .config-row input[type=text], .config-row input[type=url], .config-row input[type=password],
+        .config-row textarea, .config-row select {
+            background: #0a0a0f; border: 1px solid #333; color: #e0e0e0;
+            padding: 8px 12px; border-radius: 6px; font-size: 0.85rem; flex: 1;
+        }
+        .config-row input:focus, .config-row textarea:focus, .config-row select:focus { outline: none; border-color: #e94560; }
+        .config-hint { font-size: 0.72rem; color: #666; margin-top: -4px; margin-bottom: 8px; padding-left: 130px; }
+        .config-hint a { color: #5ca0d3; }
+        .toggle-switch { position: relative; width: 44px; height: 24px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-switch .slider { position: absolute; inset: 0; background: #333; border-radius: 12px; cursor: pointer; transition: 0.3s; }
+        .toggle-switch .slider::before { content: ''; position: absolute; width: 18px; height: 18px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: 0.3s; }
+        .toggle-switch input:checked + .slider { background: #e94560; }
+        .toggle-switch input:checked + .slider::before { transform: translateX(20px); }
+        .btn-row { display: flex; gap: 10px; margin-top: 18px; justify-content: flex-end; }
+        .btn-row button { padding: 10px 20px; border-radius: 6px; border: none; cursor: pointer; font-weight: 600; font-size: 0.85rem; }
+        .btn-save { background: #e94560; color: #fff; }
+        .btn-cancel { background: #333; color: #ccc; }
+        .btn-add { background: transparent; border: 1px dashed #555 !important; color: #888; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; margin-top: 6px; }
+        .btn-add:hover { border-color: #e94560 !important; color: #e94560; }
+        .btn-remove { background: transparent; border: none; color: #ff1744; cursor: pointer; font-size: 1.1rem; padding: 0 4px; }
+        .custom-items-list { max-height: 200px; overflow-y: auto; }
+        .custom-item-entry { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+        .custom-item-entry select, .custom-item-entry input { background: #0a0a0f; border: 1px solid #333; color: #e0e0e0; padding: 6px 8px; border-radius: 4px; font-size: 0.8rem; }
+        .custom-item-entry select { width: 100px; }
+        .custom-item-entry input { flex: 1; }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0a0a0f; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+
+        .status-bar {
+            position: fixed; bottom: 0; left: 0; right: 0; background: #111;
+            border-top: 1px solid #222; padding: 6px 20px;
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 0.75rem; color: #89909e; z-index: 50;
+        }
+        .status-bar .live-dot { width: 6px; height: 6px; background: #00e676; border-radius: 50%; display: inline-block; margin-right: 6px; animation: pulse 2s infinite; }
+        .status-bar .live-dot.partial { background: #ffd54f; }
+        .status-bar .live-dot.offline { background: #ff6e40; }
+        .status-feeds { display: flex; gap: 12px; }
+        .feed-status { display: flex; align-items: center; gap: 4px; }
+        .feed-dot { width: 5px; height: 5px; border-radius: 50%; }
+        .feed-dot.ok { background: #00e676; }
+        .feed-dot.err { background: #ff1744; }
+        .feed-dot.pending { background: #ffd600; animation: pulse 1s infinite; }
+        .feed-dot.cached { background: #29b6f6; }
+        .live-badge-header.partial { background: #493900; color: #ffe082; }
+        .live-badge-header.partial .dot { background: #ffd54f; }
+
+        .empty-state { text-align: center; padding: 60px 24px; color: #9198a6; font-size: 1rem; }
+
+        @media (max-width: 900px) {
+            .app-header { align-items: flex-start; gap: 12px; flex-wrap: wrap; padding: 12px 14px; }
+            .header-controls { width: 100%; flex-wrap: wrap; }
+            .speed-control { order: 5; width: 100%; }
+            .speed-control input[type=range] { flex: 1; }
+            .status-feeds { display: none; }
+            .ticker-item { max-width: 88vw; padding: 10px 14px; }
+            .ticker-item .text { max-width: 58vw; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .ticker-lane { overflow-x: auto; }
+            .ticker-track { animation: none !important; transform: none !important; }
+            .live-badge-header .dot, .status-bar .live-dot, .badge.live { animation: none !important; }
+            .app-header h1 { animation: none; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-header">
+    <div class="brand-block">
+        <h1>ULTIMATE TICKER TAPE</h1>
+        <span class="version-mark">v3.0 · DuckWalk composite</span>
+    </div>
+    <div class="header-controls">
+        <div class="live-badge-header offline" id="liveBadge"><span class="dot"></span> CONNECTING</div>
+        <div class="speed-control">
+            <label for="speedSlider">Motion speed</label>
+            <input type="range" id="speedSlider" min="10" max="100" value="55" aria-label="Ticker motion speed">
+        </div>
+        <button class="secondary" id="btnPause">Pause</button>
+        <button class="secondary" id="btnView">Compact View</button>
+        <button class="secondary" id="btnRefresh">Refresh Now</button>
+        <button id="btnConfig">Customize</button>
+    </div>
+</div>
+
+<div class="ticker-container" id="tickerContainer"></div>
+
+<!-- Detail Panel -->
+<div class="detail-overlay" id="detailOverlay" role="dialog" aria-modal="true" aria-labelledby="detailTitleText" aria-hidden="true">
+    <div class="detail-backdrop" id="detailBackdrop"></div>
+    <div class="detail-panel" id="detailPanel" tabindex="-1">
+        <div class="detail-header">
+            <span class="detail-type" id="detailType">STOCK</span>
+            <button class="detail-close" id="detailClose" aria-label="Close details">&#x2715;</button>
+        </div>
+        <div class="detail-body" id="detailBody"></div>
+        <div class="detail-actions" id="detailActions"></div>
+    </div>
+</div>
+
+<!-- Config Panel -->
+<div class="config-overlay" id="configOverlay" role="dialog" aria-modal="true" aria-labelledby="configTitle" aria-hidden="true">
+    <div class="config-panel" tabindex="-1">
+        <h2 id="configTitle">Customize Your Ticker</h2>
+
+        <h3>Live Data</h3>
+        <div class="config-section">
+            <div class="config-row">
+                <label>Enable Live Data</label>
+                <label class="toggle-switch"><input type="checkbox" id="cfgLiveData" checked><span class="slider"></span></label>
+            </div>
+            <div class="config-row">
+                <label>Finnhub API Key</label>
+                <input type="password" id="cfgFinnhubKey" placeholder="Enter key for live stock prices...">
+            </div>
+            <div class="config-hint">Free signup at <a href="https://finnhub.io/register" target="_blank" rel="noopener noreferrer">finnhub.io</a> — only needed for stocks. The key stays in this browser.</div>
+        </div>
+
+        <h3>Lanes</h3>
+        <div class="config-section">
+            <div class="config-row"><label>Stocks</label><label class="toggle-switch"><input type="checkbox" data-lane="stocks" checked><span class="slider"></span></label></div>
+            <div class="config-row"><label>Crypto</label><label class="toggle-switch"><input type="checkbox" data-lane="crypto" checked><span class="slider"></span></label></div>
+            <div class="config-row"><label>News Headlines</label><label class="toggle-switch"><input type="checkbox" data-lane="news" checked><span class="slider"></span></label></div>
+            <div class="config-row"><label>Reddit</label><label class="toggle-switch"><input type="checkbox" data-lane="reddit" checked><span class="slider"></span></label></div>
+            <div class="config-row"><label>Celebrity Gossip</label><label class="toggle-switch"><input type="checkbox" data-lane="gossip" checked><span class="slider"></span></label></div>
+            <div class="config-row"><label>Weather</label><label class="toggle-switch"><input type="checkbox" data-lane="weather" checked><span class="slider"></span></label></div>
+            <div class="config-row"><label>Sports</label><label class="toggle-switch"><input type="checkbox" data-lane="sports" checked><span class="slider"></span></label></div>
+            <div class="config-row"><label>Custom Items</label><label class="toggle-switch"><input type="checkbox" data-lane="custom" checked><span class="slider"></span></label></div>
+        </div>
+
+        <h3>Add Custom Ticker Items</h3>
+        <div class="config-section">
+            <div class="custom-items-list" id="customItemsList"></div>
+            <button class="btn-add" id="btnAddCustom">+ Add Item</button>
+        </div>
+
+        <h3>Appearance</h3>
+        <div class="config-section">
+            <div class="config-row">
+                <label>Direction</label>
+                <select id="cfgDirection"><option value="left">Right to Left</option><option value="right">Left to Right</option></select>
+            </div>
+            <div class="config-row">
+                <label>Lane Size</label>
+                <select id="cfgDensity"><option value="compact">Compact</option><option value="comfortable" selected>Comfortable</option><option value="large">Large</option></select>
+            </div>
+        </div>
+
+        <div class="btn-row">
+            <button class="btn-cancel" id="btnCancelConfig">Cancel</button>
+            <button class="btn-save" id="btnSaveConfig">Save & Apply</button>
+        </div>
+    </div>
+</div>
+
+<div class="status-bar">
+    <div><span class="live-dot offline" id="statusDot"></span> <span id="statusLabel">Connecting to live feeds…</span></div>
+    <div class="status-feeds" id="statusFeeds"></div>
+    <div id="statusTime"></div>
+</div>
+
+<script>
+// ═══════════════════════════════════════
+// CONFIG & STATE
+// ═══════════════════════════════════════
+function readJson(key, fallback) {
+    try {
+        const value = JSON.parse(localStorage.getItem(key) || 'null');
+        return value ?? fallback;
+    } catch { return fallback; }
+}
+
+const DEFAULT_LANES = {
+    stocks: true, crypto: true, news: true, reddit: true,
+    gossip: true, weather: true, sports: true, custom: true
+};
+let laneConfig = { ...DEFAULT_LANES, ...readJson('tickerLaneConfig', {}) };
+let customItems = readJson('tickerCustomItems', []);
+let liveDataEnabled = localStorage.getItem('tickerLiveData') !== 'false';
+let finnhubKey = localStorage.getItem('tickerFinnhubKey') || '';
+let direction = localStorage.getItem('tickerDirection') || 'left';
+let density = localStorage.getItem('tickerDensity') || 'comfortable';
+let viewMode = localStorage.getItem('tickerViewMode') || 'lanes';
+let motionSpeed = Number(localStorage.getItem('tickerMotionSpeed')) || 55;
+let isPaused = false;
+let customDraft = [];
+let lastFocusedElement = null;
+let lastConfigFocusedElement = null;
+
+// Feed status tracking
+const feedStatus = { stocks: 'pending', crypto: 'pending', news: 'pending', reddit: 'pending', weather: 'pending', gossip: 'pending', sports: 'pending' };
+
+// ═══════════════════════════════════════
+// DEMO / FALLBACK DATA
+// ═══════════════════════════════════════
+const STOCK_SYMBOLS = ['AAPL','MSFT','GOOGL','AMZN','NVDA','TSLA','META','NFLX','AMD','DIS','JPM','V'];
+const STOCK_NAMES = { AAPL:'Apple', MSFT:'Microsoft', GOOGL:'Alphabet', AMZN:'Amazon', NVDA:'NVIDIA', TSLA:'Tesla', META:'Meta', NFLX:'Netflix', AMD:'AMD', DIS:'Disney', JPM:'JPMorgan', V:'Visa' };
+
+const SAMPLE_STOCKS = {
+    AAPL:[237.42,2.15,0.91], MSFT:[452.18,-3.22,-0.71], GOOGL:[189.73,4.56,2.46],
+    AMZN:[228.91,1.87,0.82], NVDA:[142.65,8.93,6.68], TSLA:[387.20,-12.45,-3.12],
+    META:[612.34,5.67,0.93], NFLX:[948.12,15.34,1.64], AMD:[118.45,-2.18,-1.81],
+    DIS:[112.88,0.76,0.68], JPM:[258.33,1.12,0.44], V:[324.56,-0.89,-0.27]
+};
+
+let stocksData = STOCK_SYMBOLS.map(sym => ({
+    symbol: sym, name: STOCK_NAMES[sym], price: SAMPLE_STOCKS[sym][0], change: SAMPLE_STOCKS[sym][1], pct: SAMPLE_STOCKS[sym][2],
+    open: 0, high: 0, low: 0, vol: 'N/A', cap: 'N/A', pe: 'N/A', sector: 'Technology',
+    desc: `${STOCK_NAMES[sym]} sample quote. Add a Finnhub key for live pricing.`, isLive: false
+}));
+
+const CRYPTO_IDS = ['bitcoin','ethereum','solana','dogecoin','cardano','xrp','polkadot','avalanche-2'];
+const CRYPTO_MAP = {
+    bitcoin:{symbol:'BTC',emoji:'₿'}, ethereum:{symbol:'ETH',emoji:'Ξ'}, solana:{symbol:'SOL',emoji:'◎'},
+    dogecoin:{symbol:'DOGE',emoji:'🐕'}, cardano:{symbol:'ADA',emoji:'♦'}, xrp:{symbol:'XRP',emoji:'✕'},
+    polkadot:{symbol:'DOT',emoji:'●'}, 'avalanche-2':{symbol:'AVAX',emoji:'🔺'}
+};
+
+const SAMPLE_CRYPTO = {
+    bitcoin:[97842.50,1.29], ethereum:[3284.15,-1.36], solana:[218.73,6.06], dogecoin:[0.3842,6.40],
+    cardano:[1.12,7.69], xrp:[2.87,-4.97], polkadot:[8.45,3.94], 'avalanche-2':[42.18,7.99]
+};
+
+let cryptoData = CRYPTO_IDS.map(id => ({
+    id, symbol: CRYPTO_MAP[id].symbol, name: id.charAt(0).toUpperCase()+id.slice(1).replace('-2',''),
+    emoji: CRYPTO_MAP[id].emoji, price: SAMPLE_CRYPTO[id][0], change: 0, pct: SAMPLE_CRYPTO[id][1],
+    high24: 0, low24: 0, vol24: 'N/A', cap: 'N/A', supply: 'N/A',
+    desc: 'Sample quote shown until the live crypto feed connects.', isLive: false
+}));
+
+let newsData = [
+    { source:'BBC', headline:'Open BBC News', desc:'Source shortcut shown until the live feed connects.', link:'https://www.bbc.com/news', badge:'', isLive:false },
+    { source:'NPR', headline:'Open NPR News', desc:'Source shortcut shown until the live feed connects.', link:'https://www.npr.org/sections/news/', badge:'', isLive:false },
+    { source:'NYT', headline:'Open The New York Times', desc:'Source shortcut shown until the live feed connects.', link:'https://www.nytimes.com/', badge:'', isLive:false }
+];
+let redditData = [
+    { subreddit:'r/technology', title:'Open r/technology', desc:'Source shortcut shown until the live feed connects.', link:'https://www.reddit.com/r/technology/', isLive:false },
+    { subreddit:'r/science', title:'Open r/science', desc:'Source shortcut shown until the live feed connects.', link:'https://www.reddit.com/r/science/', isLive:false },
+    { subreddit:'r/space', title:'Open r/space', desc:'Source shortcut shown until the live feed connects.', link:'https://www.reddit.com/r/space/', isLive:false }
+];
+let gossipData = [
+    { source:'People', headline:'Open People', desc:'Source shortcut shown until the live feed connects.', link:'https://people.com/', emoji:'✨', badge:'', isLive:false },
+    { source:'Page Six', headline:'Open Page Six', desc:'Source shortcut shown until the live feed connects.', link:'https://pagesix.com/', emoji:'✨', badge:'', isLive:false }
+];
+let weatherData = [];
+let sportsData = [
+    { league:'NFL', headline:'Open NFL news', desc:'Source shortcut shown until the live feed connects.', link:'https://www.espn.com/nfl/', emoji:'🏈', badge:'', isLive:false },
+    { league:'NBA', headline:'Open NBA news', desc:'Source shortcut shown until the live feed connects.', link:'https://www.espn.com/nba/', emoji:'🏀', badge:'', isLive:false },
+    { league:'MLB', headline:'Open MLB news', desc:'Source shortcut shown until the live feed connects.', link:'https://www.espn.com/mlb/', emoji:'⚾', badge:'', isLive:false }
+];
+
+// Weather cities with coords
+const WEATHER_CITIES = [
+    { name: 'New York', lat: 40.71, lon: -74.01 },
+    { name: 'Los Angeles', lat: 34.05, lon: -118.24 },
+    { name: 'Chicago', lat: 41.88, lon: -87.63 },
+    { name: 'Miami', lat: 25.76, lon: -80.19 },
+    { name: 'London', lat: 51.51, lon: -0.13 },
+    { name: 'Tokyo', lat: 35.68, lon: 139.69 },
+    { name: 'Sydney', lat: -33.87, lon: 151.21 },
+    { name: 'Dubai', lat: 25.20, lon: 55.27 }
+];
+
+weatherData = WEATHER_CITIES.slice(0, 4).map(city => ({
+    city: city.name, temp: '—', condition: 'Waiting for live weather', emoji: '🌤️',
+    high: '—', low: '—', humidity: '—', wind: '—', forecast: [], isLive: false
+}));
+
+// WMO weather code → emoji + description
+const WMO_CODES = {
+    0:'☀️ Clear',1:'🌤️ Mainly Clear',2:'⛅ Partly Cloudy',3:'☁️ Overcast',
+    45:'🌫️ Foggy',48:'🌫️ Rime Fog',51:'🌦️ Light Drizzle',53:'🌦️ Drizzle',55:'🌧️ Heavy Drizzle',
+    61:'🌧️ Light Rain',63:'🌧️ Rain',65:'🌧️ Heavy Rain',66:'🌨️ Freezing Rain',67:'🌨️ Heavy Freezing Rain',
+    71:'🌨️ Light Snow',73:'🌨️ Snow',75:'❄️ Heavy Snow',77:'❄️ Snow Grains',
+    80:'🌦️ Light Showers',81:'🌧️ Showers',82:'🌧️ Heavy Showers',
+    85:'🌨️ Snow Showers',86:'❄️ Heavy Snow Showers',
+    95:'⛈️ Thunderstorm',96:'⛈️ Hail Storm',99:'⛈️ Severe Hail Storm'
+};
+function wmoToEmoji(code) { return (WMO_CODES[code] || '🌤️ Unknown').split(' ')[0]; }
+function wmoToDesc(code) { return (WMO_CODES[code] || '🌤️ Unknown').split(' ').slice(1).join(' ') || 'Unknown'; }
+const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+// ═══════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════
+function escapeHtml(str) { const d = document.createElement('div'); d.textContent = str || ''; return d.innerHTML; }
+function searchUrl(q) { return 'https://www.google.com/search?q=' + encodeURIComponent(q); }
+function safeHttpUrl(value) {
+    if (!value) return '';
+    try {
+        const url = new URL(value, window.location.href);
+        return (url.protocol === 'http:' || url.protocol === 'https:') ? url.href : '';
+    } catch { return ''; }
+}
+function actionLink(url, label, cssClass='action-secondary', icon='↗') {
+    const safe = safeHttpUrl(url);
+    if (!safe) return '';
+    return `<a href="${escapeHtml(safe)}" target="_blank" rel="noopener noreferrer" class="${cssClass}"><span aria-hidden="true">${icon}</span> ${escapeHtml(label)}</a>`;
+}
+function storyThumb(url, alt='') {
+    const safe = safeHttpUrl(url);
+    return safe ? `<img class="thumb" src="${escapeHtml(safe)}" alt="${escapeHtml(alt)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : '';
+}
+function fmtNum(n) {
+    if (!Number.isFinite(n)) return 'N/A';
+    if (n >= 1e12) return (n/1e12).toFixed(2)+'T';
+    if (n >= 1e9) return (n/1e9).toFixed(2)+'B';
+    if (n >= 1e6) return (n/1e6).toFixed(2)+'M';
+    if (n >= 1e3) return (n/1e3).toFixed(1)+'K';
+    return n.toFixed(2);
+}
+function fmtPrice(p) {
+    if (!Number.isFinite(p)) return '—';
+    return p >= 1 ? '$'+p.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) : '$'+p.toFixed(4);
+}
+
+function cacheFeed(name, data) {
+    try { localStorage.setItem(`tickerCache:${name}`, JSON.stringify({ savedAt: Date.now(), data })); } catch { /* cache is optional */ }
+}
+
+function restoreCachedFeeds() {
+    const targets = {
+        stocks: value => { stocksData = value; }, crypto: value => { cryptoData = value; },
+        news: value => { newsData = value; }, reddit: value => { redditData = value; },
+        weather: value => { weatherData = value; }, gossip: value => { gossipData = value; },
+        sports: value => { sportsData = value; }
+    };
+    Object.entries(targets).forEach(([name, assign]) => {
+        const cached = readJson(`tickerCache:${name}`, null);
+        if (!cached || !Array.isArray(cached.data) || !cached.data.length) return;
+        if (Date.now() - Number(cached.savedAt || 0) > 24 * 60 * 60 * 1000) return;
+        assign(cached.data.map(item => ({ ...item, isLive: false, isCached: true })));
+        feedStatus[name] = 'cached';
+    });
+}
+
+function updateFeedStatus() {
+    const el = document.getElementById('statusFeeds');
+    el.innerHTML = Object.entries(feedStatus).map(([k,v]) =>
+        `<div class="feed-status"><span class="feed-dot ${v}"></span>${k}</div>`
+    ).join('');
+    const values = Object.values(feedStatus);
+    const liveCount = values.filter(v => v === 'ok').length;
+    const cachedCount = values.filter(v => v === 'cached').length;
+    const pendingCount = values.filter(v => v === 'pending').length;
+    const total = values.length;
+    const badge = document.getElementById('liveBadge');
+    const label = document.getElementById('statusLabel');
+    const statusDot = document.getElementById('statusDot');
+    statusDot.className = 'live-dot ' + (liveCount === total ? '' : (liveCount > 0 || cachedCount > 0 ? 'partial' : 'offline'));
+    if (!liveDataEnabled) {
+        badge.className = 'live-badge-header offline';
+        badge.innerHTML = '<span class="dot"></span> DEMO';
+        label.textContent = cachedCount ? `Live feeds off · showing ${cachedCount} cached feeds` : 'Live feeds off · showing clearly marked sample data';
+    } else if (liveCount === total) {
+        badge.className = 'live-badge-header';
+        badge.innerHTML = '<span class="dot"></span> LIVE';
+        label.textContent = `All ${total} feeds live · select any item to read it`;
+    } else if (liveCount > 0) {
+        badge.className = 'live-badge-header partial';
+        badge.innerHTML = '<span class="dot"></span> PARTIAL';
+        label.textContent = `${liveCount} of ${total} feeds live${cachedCount ? ` · ${cachedCount} cached` : ''}`;
+    } else if (pendingCount > 0) {
+        badge.className = 'live-badge-header offline';
+        badge.innerHTML = '<span class="dot"></span> CONNECTING';
+        label.textContent = cachedCount ? `Connecting · showing ${cachedCount} cached feeds` : 'Connecting to live feeds…';
+    } else {
+        badge.className = 'live-badge-header offline';
+        badge.innerHTML = '<span class="dot"></span> OFFLINE';
+        label.textContent = cachedCount ? `Feeds unavailable · showing ${cachedCount} cached feeds` : 'Feeds unavailable · sample/source shortcuts remain usable';
+    }
+}
+
+// ═══════════════════════════════════════
+// API FETCHERS
+// ═══════════════════════════════════════
+
+// ── Stocks (Finnhub) ──
+async function fetchStocks() {
+    if (!liveDataEnabled || !finnhubKey) {
+        feedStatus.stocks = stocksData.some(item => item.isCached) ? 'cached' : 'err';
+        updateFeedStatus();
+        return;
+    }
+    try {
+        const results = await Promise.allSettled(
+            STOCK_SYMBOLS.map(sym =>
+                fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${finnhubKey}`).then(r => r.json())
+            )
+        );
+        let anyOk = false;
+        results.forEach((res, i) => {
+            if (res.status === 'fulfilled' && res.value && res.value.c > 0) {
+                const q = res.value;
+                stocksData[i] = {
+                    ...stocksData[i],
+                    price: q.c, change: q.d || 0, pct: q.dp || 0,
+                    open: q.o, high: q.h, low: q.l,
+                    isLive: true
+                };
+                anyOk = true;
+            }
+        });
+        feedStatus.stocks = anyOk ? 'ok' : 'err';
+        if (anyOk) cacheFeed('stocks', stocksData);
+    } catch(e) { feedStatus.stocks = stocksData.some(item => item.isCached) ? 'cached' : 'err'; console.warn('Stocks fetch error:', e); }
+    updateFeedStatus();
+    renderLane('stocks');
+}
+
+// ── Crypto (CoinCap v2) ──
+let cryptoWs = null;
+async function fetchCrypto() {
+    if (!liveDataEnabled) { feedStatus.crypto = cryptoData.some(item => item.isCached) ? 'cached' : 'err'; updateFeedStatus(); return; }
+    try {
+        const res = await fetch(`https://api.coincap.io/v2/assets?ids=${CRYPTO_IDS.join(',')}`);
+        const json = await res.json();
+        if (json.data) {
+            json.data.forEach(asset => {
+                const idx = cryptoData.findIndex(c => c.id === asset.id);
+                if (idx >= 0) {
+                    cryptoData[idx] = {
+                        ...cryptoData[idx],
+                        price: parseFloat(asset.priceUsd),
+                        pct: parseFloat(asset.changePercent24Hr) || 0,
+                        cap: '$' + fmtNum(parseFloat(asset.marketCapUsd)),
+                        vol24: '$' + fmtNum(parseFloat(asset.volumeUsd24Hr)),
+                        supply: fmtNum(parseFloat(asset.supply)) + (asset.maxSupply ? ' / ' + fmtNum(parseFloat(asset.maxSupply)) : ' / ∞'),
+                        isLive: true
+                    };
+                }
+            });
+            feedStatus.crypto = 'ok';
+            cacheFeed('crypto', cryptoData);
+        }
+    } catch(e) { feedStatus.crypto = cryptoData.some(item => item.isCached) ? 'cached' : 'err'; console.warn('Crypto REST error:', e); }
+    updateFeedStatus();
+    renderLane('crypto');
+    connectCryptoWs();
+}
+
+function connectCryptoWs() {
+    if (!liveDataEnabled || cryptoWs) return;
+    try {
+        const wsIds = CRYPTO_IDS.map(id => id === 'avalanche-2' ? 'avalanche' : id).join(',');
+        cryptoWs = new WebSocket(`wss://ws.coincap.io/prices?assets=${wsIds}`);
+        cryptoWs.onmessage = (msg) => {
+            const prices = JSON.parse(msg.data);
+            let changed = false;
+            Object.entries(prices).forEach(([name, price]) => {
+                const id = name === 'avalanche' ? 'avalanche-2' : name;
+                const idx = cryptoData.findIndex(c => c.id === id);
+                if (idx >= 0) {
+                    cryptoData[idx].price = parseFloat(price);
+                    // Keep the REST feed's true 24-hour percentage; the WebSocket only updates price.
+                    cryptoData[idx].isLive = true;
+                    changed = true;
+                }
+            });
+            if (changed) renderLane('crypto');
+        };
+        cryptoWs.onclose = () => { cryptoWs = null; setTimeout(connectCryptoWs, 5000); };
+        cryptoWs.onerror = () => { cryptoWs.close(); };
+    } catch(e) { console.warn('Crypto WS error:', e); }
+}
+
+// ── RSS Helper ──
+async function fetchRss(feedUrl) {
+    const res = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feedUrl)}`);
+    const json = await res.json();
+    if (json.status === 'ok' && json.items) return json.items;
+    return [];
+}
+
+// ── News ──
+async function fetchNews() {
+    if (!liveDataEnabled) { feedStatus.news = newsData.some(item => item.isCached) ? 'cached' : 'err'; updateFeedStatus(); return; }
+    try {
+        const feeds = [
+            { url: 'https://feeds.bbci.co.uk/news/rss.xml', source: 'BBC' },
+            { url: 'https://feeds.npr.org/1001/rss.xml', source: 'NPR' },
+            { url: 'https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml', source: 'NYT' },
+            { url: 'https://feeds.washingtonpost.com/rss/world', source: 'Washington Post' },
+        ];
+        const results = await Promise.allSettled(feeds.map(f => fetchRss(f.url).then(items => items.map(it => ({...it, feedSource: f.source})))));
+        let incoming = [];
+        results.forEach(r => { if (r.status === 'fulfilled') incoming.push(...r.value); });
+        incoming.sort((a, b) => new Date(b.pubDate || 0) - new Date(a.pubDate || 0));
+        incoming = incoming.slice(0, 20).map(item => ({
+            source: item.feedSource || 'News',
+            headline: item.title,
+            desc: stripHtml(item.description || item.content || ''),
+            link: item.link,
+            img: item.thumbnail || item.enclosure?.link || '',
+            pubDate: item.pubDate,
+            badge: isRecent(item.pubDate) ? 'new' : '',
+            isLive: true
+        }));
+        if (incoming.length) { newsData = incoming; feedStatus.news = 'ok'; cacheFeed('news', newsData); }
+        else feedStatus.news = newsData.some(item => item.isCached) ? 'cached' : 'err';
+    } catch(e) { feedStatus.news = newsData.some(item => item.isCached) ? 'cached' : 'err'; console.warn('News fetch error:', e); }
+    updateFeedStatus();
+    renderLane('news');
+}
+
+// ── Reddit ──
+async function fetchReddit() {
+    if (!liveDataEnabled) { feedStatus.reddit = redditData.some(item => item.isCached) ? 'cached' : 'err'; updateFeedStatus(); return; }
+    try {
+        const subs = ['technology','worldnews','science','space','gaming','wallstreetbets','todayilearned','movies'];
+        const results = await Promise.allSettled(subs.map(s =>
+            fetchRss(`https://www.reddit.com/r/${s}/hot/.rss`).then(items => items.map(it => ({...it, sub: 'r/'+s})))
+        ));
+        let incoming = [];
+        results.forEach(r => { if (r.status === 'fulfilled') incoming.push(...r.value); });
+        incoming = incoming.slice(0, 24).map(item => ({
+            subreddit: item.sub,
+            title: item.title,
+            desc: stripHtml(item.description || item.content || '').slice(0, 500),
+            link: item.link,
+            badge: '',
+            isLive: true
+        }));
+        if (incoming.length) { redditData = incoming; feedStatus.reddit = 'ok'; cacheFeed('reddit', redditData); }
+        else feedStatus.reddit = redditData.some(item => item.isCached) ? 'cached' : 'err';
+    } catch(e) { feedStatus.reddit = redditData.some(item => item.isCached) ? 'cached' : 'err'; console.warn('Reddit fetch error:', e); }
+    updateFeedStatus();
+    renderLane('reddit');
+}
+
+// ── Weather (Open-Meteo) ──
+async function fetchWeather() {
+    if (!liveDataEnabled) { feedStatus.weather = weatherData.some(item => item.isCached) ? 'cached' : 'err'; updateFeedStatus(); return; }
+    try {
+        const results = await Promise.allSettled(WEATHER_CITIES.map(city =>
+            fetch(`https://api.open-meteo.com/v1/forecast?latitude=${city.lat}&longitude=${city.lon}&current=temperature_2m,weather_code,wind_speed_10m,relative_humidity_2m&daily=temperature_2m_max,temperature_2m_min,weather_code&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto&forecast_days=6`)
+                .then(r => r.json()).then(data => ({city: city.name, data}))
+        ));
+        const incoming = [];
+        results.forEach(r => {
+            if (r.status === 'fulfilled' && r.value.data.current) {
+                const d = r.value.data;
+                const cur = d.current;
+                const daily = d.daily;
+                const forecast = [];
+                if (daily && daily.time) {
+                    for (let i = 1; i < Math.min(6, daily.time.length); i++) {
+                        const dt = new Date(daily.time[i]);
+                        forecast.push({
+                            day: DAY_NAMES[dt.getDay()],
+                            emoji: wmoToEmoji(daily.weather_code[i]),
+                            hi: Math.round(daily.temperature_2m_max[i]),
+                            lo: Math.round(daily.temperature_2m_min[i])
+                        });
+                    }
+                }
+                incoming.push({
+                    city: r.value.city,
+                    temp: Math.round(cur.temperature_2m) + '°F',
+                    condition: wmoToDesc(cur.weather_code),
+                    emoji: wmoToEmoji(cur.weather_code),
+                    high: daily ? Math.round(daily.temperature_2m_max[0]) + '°F' : 'N/A',
+                    low: daily ? Math.round(daily.temperature_2m_min[0]) + '°F' : 'N/A',
+                    humidity: cur.relative_humidity_2m + '%',
+                    wind: Math.round(cur.wind_speed_10m) + ' mph',
+                    uv: 'N/A',
+                    forecast,
+                    isLive: true
+                });
+            }
+        });
+        if (incoming.length) { weatherData = incoming; feedStatus.weather = 'ok'; cacheFeed('weather', weatherData); }
+        else feedStatus.weather = weatherData.some(item => item.isCached) ? 'cached' : 'err';
+    } catch(e) { feedStatus.weather = weatherData.some(item => item.isCached) ? 'cached' : 'err'; console.warn('Weather fetch error:', e); }
+    updateFeedStatus();
+    renderLane('weather');
+}
+
+// ── Gossip (TMZ, People, E! RSS) ──
+async function fetchGossip() {
+    if (!liveDataEnabled) { feedStatus.gossip = gossipData.some(item => item.isCached) ? 'cached' : 'err'; updateFeedStatus(); return; }
+    try {
+        const feeds = [
+            { url: 'https://www.tmz.com/rss.xml', source: 'TMZ' },
+            { url: 'https://people.com/feed/', source: 'People' },
+            { url: 'https://pagesix.com/feed/', source: 'Page Six' },
+        ];
+        const results = await Promise.allSettled(feeds.map(f => fetchRss(f.url).then(items => items.map(it => ({...it, feedSource: f.source})))));
+        let incoming = [];
+        results.forEach(r => { if (r.status === 'fulfilled') incoming.push(...r.value); });
+        incoming.sort((a, b) => new Date(b.pubDate || 0) - new Date(a.pubDate || 0));
+        incoming = incoming.slice(0, 18).map(item => ({
+            source: item.feedSource || 'Entertainment',
+            headline: item.title,
+            desc: stripHtml(item.description || item.content || ''),
+            link: item.link,
+            img: item.thumbnail || item.enclosure?.link || '',
+            emoji: pickGossipEmoji(item.title),
+            badge: isRecent(item.pubDate) ? 'new' : '',
+            isLive: true
+        }));
+        if (incoming.length) { gossipData = incoming; feedStatus.gossip = 'ok'; cacheFeed('gossip', gossipData); }
+        else feedStatus.gossip = gossipData.some(item => item.isCached) ? 'cached' : 'err';
+    } catch(e) { feedStatus.gossip = gossipData.some(item => item.isCached) ? 'cached' : 'err'; console.warn('Gossip fetch error:', e); }
+    updateFeedStatus();
+    renderLane('gossip');
+}
+
+// ── Sports (ESPN) ──
+async function fetchSports() {
+    if (!liveDataEnabled) { feedStatus.sports = sportsData.some(item => item.isCached) ? 'cached' : 'err'; updateFeedStatus(); return; }
+    try {
+        // Try ESPN scoreboard APIs for live scores
+        const sportApis = [
+            { league: 'NFL', url: 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/news' },
+            { league: 'NBA', url: 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/news' },
+            { league: 'MLB', url: 'https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/news' },
+            { league: 'Soccer', url: 'https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/news' },
+            { league: 'NHL', url: 'https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/news' },
+        ];
+        const leagueEmoji = { NFL:'🏈', NBA:'🏀', MLB:'⚾', Soccer:'⚽', NHL:'🏒', F1:'🏎️', Tennis:'🎾', UFC:'🥊', Sports:'🏆' };
+
+        const results = await Promise.allSettled(sportApis.map(s =>
+            fetch(s.url).then(r => r.json()).then(data =>
+                (data.articles || []).slice(0, 4).map(a => ({
+                    league: s.league,
+                    headline: a.headline || a.title || '',
+                    desc: a.description || '',
+                    link: a.links?.web?.href || '',
+                    img: a.images?.[0]?.url || '',
+                    emoji: leagueEmoji[s.league] || '🏆',
+                    badge: '',
+                    isLive: true
+                }))
+            )
+        ));
+
+        let incoming = [];
+        results.forEach(r => { if (r.status === 'fulfilled') incoming.push(...r.value); });
+
+        // Fallback to RSS if ESPN API doesn't work
+        if (incoming.length === 0) {
+            const rssItems = await fetchRss('https://www.espn.com/espn/rss/news');
+            incoming = rssItems.slice(0, 15).map(item => ({
+                league: 'Sports',
+                headline: item.title,
+                desc: stripHtml(item.description || ''),
+                link: item.link,
+                emoji: '🏆',
+                badge: '',
+                isLive: true
+            }));
+        }
+
+        incoming = incoming.slice(0, 20);
+        if (incoming.length) { sportsData = incoming; feedStatus.sports = 'ok'; cacheFeed('sports', sportsData); }
+        else feedStatus.sports = sportsData.some(item => item.isCached) ? 'cached' : 'err';
+    } catch(e) { feedStatus.sports = sportsData.some(item => item.isCached) ? 'cached' : 'err'; console.warn('Sports fetch error:', e); }
+    updateFeedStatus();
+    renderLane('sports');
+}
+
+// ── Helpers ──
+function stripHtml(html) {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    return tmp.textContent || tmp.innerText || '';
+}
+
+function isRecent(dateStr) {
+    if (!dateStr) return false;
+    const d = new Date(dateStr);
+    return (Date.now() - d.getTime()) < 3600000 * 3; // 3 hours
+}
+
+function pickGossipEmoji(title) {
+    const t = (title || '').toLowerCase();
+    if (t.includes('wedding') || t.includes('engag') || t.includes('married')) return '💍';
+    if (t.includes('baby') || t.includes('pregnant') || t.includes('birth')) return '👶';
+    if (t.includes('divorce') || t.includes('split') || t.includes('breakup')) return '💔';
+    if (t.includes('album') || t.includes('song') || t.includes('tour') || t.includes('music')) return '🎤';
+    if (t.includes('movie') || t.includes('film') || t.includes('trailer')) return '🎬';
+    if (t.includes('fashion') || t.includes('dress') || t.includes('style')) return '👗';
+    if (t.includes('photo') || t.includes('pic') || t.includes('selfie')) return '📸';
+    if (t.includes('home') || t.includes('house') || t.includes('mansion')) return '🏠';
+    if (t.includes('car') || t.includes('vehicle')) return '🚗';
+    if (t.includes('arrested') || t.includes('jail') || t.includes('court')) return '⚖️';
+    return '✨';
+}
+
+// ═══════════════════════════════════════
+// BUILD TICKER ITEMS
+// ═══════════════════════════════════════
+
+function buildStockItem(s, idx) {
+    const up = s.change >= 0;
+    return `<button type="button" class="ticker-item stock" data-type="stock" data-idx="${idx}" data-readable="true" data-action="DETAILS" aria-label="Open ${escapeHtml(s.symbol)} details">
+        <span class="symbol">${s.symbol}</span>
+        <span class="text">${s.name}</span>
+        <span class="${up?'price-up':'price-down'}">${fmtPrice(s.price)}</span>
+        <span class="${up?'price-up':'price-down'}">${up?'▲':'▼'} ${Math.abs(s.change).toFixed(2)} (${up?'+':''}${s.pct.toFixed(2)}%)</span>
+    </button>`;
+}
+
+function buildCryptoItem(c, idx) {
+    const up = c.pct >= 0;
+    return `<button type="button" class="ticker-item crypto" data-type="crypto" data-idx="${idx}" data-readable="true" data-action="DETAILS" aria-label="Open ${escapeHtml(c.name)} details">
+        <span class="emoji">${c.emoji}</span>
+        <span class="symbol">${c.symbol}</span>
+        <span class="text">${c.name}</span>
+        <span class="${up?'price-up':'price-down'}">${fmtPrice(c.price)}</span>
+        <span class="${up?'price-up':'price-down'}">${up?'▲':'▼'} ${Math.abs(c.pct).toFixed(2)}%</span>
+    </button>`;
+}
+
+function buildNewsItem(n, idx) {
+    const badge = n.badge ? `<span class="badge ${n.badge}">${n.badge}</span>` : '';
+    return `<button type="button" class="ticker-item news" data-type="news" data-idx="${idx}" data-readable="true" data-action="READ" aria-label="Open story: ${escapeHtml(n.headline)}">
+        ${storyThumb(n.img, '')}${badge}<span class="source">${escapeHtml(n.source)}</span>
+        <span class="text">${escapeHtml(n.headline)}</span>
+    </button>`;
+}
+
+function buildRedditItem(r, idx) {
+    return `<button type="button" class="ticker-item reddit" data-type="reddit" data-idx="${idx}" data-readable="true" data-action="READ" aria-label="Open Reddit item: ${escapeHtml(r.title)}">
+        <span class="subreddit">${escapeHtml(r.subreddit)}</span>
+        <span class="text">${escapeHtml(r.title)}</span>
+    </button>`;
+}
+
+function buildGossipItem(g, idx) {
+    const badge = g.badge ? `<span class="badge ${g.badge}">${g.badge}</span>` : '';
+    return `<button type="button" class="ticker-item gossip" data-type="gossip" data-idx="${idx}" data-readable="true" data-action="READ" aria-label="Open story: ${escapeHtml(g.headline)}">
+        ${storyThumb(g.img, '')}${badge}<span class="emoji">${g.emoji}</span>
+        <span class="source">${escapeHtml(g.source)}</span>
+        <span class="text">${escapeHtml(g.headline)}</span>
+    </button>`;
+}
+
+function buildWeatherItem(w, idx) {
+    return `<button type="button" class="ticker-item weather" data-type="weather" data-idx="${idx}" data-readable="true" data-action="DETAILS" aria-label="Open ${escapeHtml(w.city)} weather details">
+        <span class="emoji">${w.emoji}</span>
+        <span class="text"><strong>${escapeHtml(w.city)}</strong> ${w.temp} ${escapeHtml(w.condition)}</span>
+        <span class="meta">H:${w.high} L:${w.low}</span>
+    </button>`;
+}
+
+function buildSportsItem(s, idx) {
+    const badge = s.badge ? `<span class="badge ${s.badge}">${s.badge}</span>` : '';
+    return `<button type="button" class="ticker-item sports-item" data-type="sports" data-idx="${idx}" data-readable="true" data-action="READ" aria-label="Open sports story: ${escapeHtml(s.headline)}">
+        ${storyThumb(s.img, '')}${badge}<span class="emoji">${s.emoji}</span>
+        <span class="source">${escapeHtml(s.league)}</span>
+        <span class="text">${escapeHtml(s.headline)}</span>
+    </button>`;
+}
+
+function buildCustomItem(c, idx) {
+    const label = c.content || c.label || c.url || 'Custom item';
+    const image = c.type === 'image' ? storyThumb(c.url, c.label || '') : '';
+    return `<button type="button" class="ticker-item" data-type="custom" data-idx="${idx}" data-readable="true" data-action="DETAILS" aria-label="Open custom item: ${escapeHtml(label)}">${image}<span class="text">${escapeHtml(label)}</span></button>`;
+}
+
+// ═══════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════
+
+function laneDuration(multiplier=1) {
+    return Math.round(Math.max(18, 145 - motionSpeed * 1.25) * multiplier);
+}
+
+function buildLane(id, label, itemsHtml, multiplier=1) {
+    if (!itemsHtml || itemsHtml.trim() === '') return '';
+    return `<div class="ticker-lane" data-lane="${id}">
+        <span class="label">${label}</span>
+        <div class="ticker-track" style="--speed: ${laneDuration(multiplier)}s">${itemsHtml + itemsHtml}</div>
+    </div>`;
+}
+
+function renderLane(laneId) {
+    if (viewMode === 'compact') { renderAllLanes(); return; }
+    const existing = document.querySelector(`.ticker-lane[data-lane="${laneId}"] .ticker-track`);
+
+    let html = '';
+    if (laneId === 'stocks' && stocksData.length) html = stocksData.map(buildStockItem).join('');
+    if (laneId === 'crypto' && cryptoData.length) html = cryptoData.map(buildCryptoItem).join('');
+    if (laneId === 'news' && newsData.length) html = newsData.map(buildNewsItem).join('');
+    if (laneId === 'reddit' && redditData.length) html = redditData.map(buildRedditItem).join('');
+    if (laneId === 'gossip' && gossipData.length) html = gossipData.map(buildGossipItem).join('');
+    if (laneId === 'weather' && weatherData.length) html = weatherData.map(buildWeatherItem).join('');
+    if (laneId === 'sports' && sportsData.length) html = sportsData.map(buildSportsItem).join('');
+
+    if (existing && html) {
+        existing.innerHTML = html + html;
+    } else if (html && laneConfig[laneId]) {
+        // Lane doesn't exist yet, do a full re-render
+        renderAllLanes();
+    }
+    applyMotionState();
+}
+
+function laneGroups() {
+    return [
+        { id:'stocks', label:'Stocks', multiplier:1, items: laneConfig.stocks ? stocksData.map(buildStockItem) : [] },
+        { id:'crypto', label:'Crypto', multiplier:1.1, items: laneConfig.crypto ? cryptoData.map(buildCryptoItem) : [] },
+        { id:'news', label:'News', multiplier:1.3, items: laneConfig.news ? newsData.map(buildNewsItem) : [] },
+        { id:'reddit', label:'Reddit', multiplier:1.2, items: laneConfig.reddit ? redditData.map(buildRedditItem) : [] },
+        { id:'gossip', label:'Gossip', multiplier:1.15, items: laneConfig.gossip ? gossipData.map(buildGossipItem) : [] },
+        { id:'weather', label:'Weather', multiplier:0.9, items: laneConfig.weather ? weatherData.map(buildWeatherItem) : [] },
+        { id:'sports', label:'Sports', multiplier:1.25, items: laneConfig.sports ? sportsData.map(buildSportsItem) : [] },
+        { id:'custom', label:'Custom', multiplier:1, items: laneConfig.custom ? customItems.map(buildCustomItem) : [] }
+    ].filter(group => group.items.length);
+}
+
+function interleaveGroups(groups) {
+    const mixed = [];
+    const longest = Math.max(0, ...groups.map(group => group.items.length));
+    for (let i = 0; i < longest; i++) {
+        groups.forEach(group => { if (group.items[i]) mixed.push(group.items[i]); });
+    }
+    return mixed.join('');
+}
+
+function applyDensity() {
+    document.body.classList.remove('density-compact', 'density-comfortable', 'density-large');
+    document.body.classList.add(`density-${density}`);
+}
+
+function applyMotionState() {
+    document.querySelectorAll('.ticker-track').forEach(track => {
+        track.style.animationPlayState = isPaused ? 'paused' : 'running';
+        track.style.animationDirection = direction === 'right' ? 'reverse' : 'normal';
+    });
+    document.getElementById('btnPause').textContent = isPaused ? 'Resume' : 'Pause';
+    document.getElementById('btnView').textContent = viewMode === 'compact' ? 'Multi-Lane View' : 'Compact View';
+}
+
+function renderAllLanes() {
+    const container = document.getElementById('tickerContainer');
+    const groups = laneGroups();
+    let html = '';
+
+    if (viewMode === 'compact' && groups.length) {
+        html = buildLane('all', 'All', interleaveGroups(groups), 1.15);
+    } else {
+        html = groups.map(group => buildLane(group.id, group.label, group.items.join(''), group.multiplier)).join('');
+    }
+
+    if (!html) html = '<div class="empty-state">No lanes are enabled. Select Customize to choose what appears.</div>';
+    container.innerHTML = html;
+    applyDensity();
+    applyMotionState();
+}
+
+// ═══════════════════════════════════════
+// DETAIL PANEL
+// ═══════════════════════════════════════
+
+function openDetail(type, idx) {
+    const dataMap = { stock: stocksData, crypto: cryptoData, news: newsData, reddit: redditData, gossip: gossipData, weather: weatherData, sports: sportsData, custom: customItems };
+    const data = dataMap[type]?.[idx];
+    if (!data) return;
+
+    document.getElementById('detailType').className = 'detail-type ' + type + '-type';
+    const freshness = data.isLive ? 'LIVE' : (data.isCached ? 'CACHED' : 'SAMPLE');
+    document.getElementById('detailType').textContent = `${type.toUpperCase()} · ${freshness}`;
+
+    let bodyHtml = '', actionsHtml = '';
+
+    if (type === 'stock') {
+        const up = data.change >= 0, cls = up ? 'up' : 'down';
+        bodyHtml = `
+            <div class="detail-title" id="detailTitleText">${data.symbol} — ${escapeHtml(data.name)}</div>
+            <div class="detail-stats">
+                <div class="detail-stat"><div class="stat-label">Price</div><div class="stat-value ${cls}">${fmtPrice(data.price)}</div></div>
+                <div class="detail-stat"><div class="stat-label">Change</div><div class="stat-value ${cls}">${up?'+':''}${data.change.toFixed(2)} (${up?'+':''}${data.pct.toFixed(2)}%)</div></div>
+                <div class="detail-stat"><div class="stat-label">Open</div><div class="stat-value">${data.open ? '$'+data.open : 'N/A'}</div></div>
+                <div class="detail-stat"><div class="stat-label">Day Range</div><div class="stat-value">${data.low && data.high ? '$'+data.low+' - $'+data.high : 'N/A'}</div></div>
+            </div>
+            <div class="detail-section"><h4>Data status</h4><div class="detail-description">${data.isLive ? 'Quote supplied by the configured live feed.' : data.isCached ? 'Last successful quote cached on this device.' : 'Clearly marked sample quote. Add a Finnhub key in Customize for live pricing.'}</div></div>`;
+        actionsHtml = [
+            actionLink(searchUrl(data.symbol+' stock price today'), `Search ${data.symbol}`, 'action-primary', '🔍'),
+            actionLink(searchUrl(data.symbol+' stock news'), 'News', 'action-secondary', '📰'),
+            actionLink(searchUrl(data.symbol+' stock chart'), 'Charts', 'action-secondary', '📊')
+        ].join('');
+    }
+    else if (type === 'crypto') {
+        const up = data.pct >= 0, cls = up ? 'up' : 'down';
+        bodyHtml = `
+            <div class="detail-title" id="detailTitleText">${data.emoji} ${escapeHtml(data.name)} (${data.symbol})</div>
+            <div class="detail-stats">
+                <div class="detail-stat"><div class="stat-label">Price</div><div class="stat-value ${cls}">${fmtPrice(data.price)}</div></div>
+                <div class="detail-stat"><div class="stat-label">24h Change</div><div class="stat-value ${cls}">${up?'+':''}${data.pct.toFixed(2)}%</div></div>
+                <div class="detail-stat"><div class="stat-label">Market Cap</div><div class="stat-value">${data.cap}</div></div>
+                <div class="detail-stat"><div class="stat-label">24h Volume</div><div class="stat-value">${data.vol24}</div></div>
+                <div class="detail-stat" style="grid-column:span 2"><div class="stat-label">Supply</div><div class="stat-value">${data.supply}</div></div>
+            </div>
+            <div class="detail-section"><h4>Data status</h4><div class="detail-description">${data.isLive ? 'Quote supplied by the live crypto feed.' : data.isCached ? 'Last successful quote cached on this device.' : 'Clearly marked sample quote shown until the live feed connects.'}</div></div>`;
+        actionsHtml = [
+            actionLink(searchUrl(data.name+' crypto price'), `Search ${data.symbol}`, 'action-primary', '🔍'),
+            actionLink(searchUrl(data.name+' crypto news'), 'News', 'action-secondary', '📰')
+        ].join('');
+    }
+    else if (type === 'news') {
+        bodyHtml = `
+            <div class="detail-title" id="detailTitleText">${escapeHtml(data.headline)}</div>
+            <div style="margin-bottom:16px"><span style="color:#ffd600;font-weight:600">${escapeHtml(data.source)}</span>
+                ${data.pubDate ? '<span style="color:#666;margin-left:12px">'+new Date(data.pubDate).toLocaleString()+'</span>' : ''}</div>
+            <div class="detail-section"><h4>Summary</h4><div class="detail-description">${escapeHtml(data.desc)}</div></div>`;
+        actionsHtml = [
+            actionLink(data.link, 'Read Source', 'action-primary', '📰'),
+            actionLink(searchUrl(data.headline), 'Search Story', 'action-secondary', '🔍')
+        ].join('');
+    }
+    else if (type === 'reddit') {
+        bodyHtml = `
+            <div class="detail-title" id="detailTitleText">${escapeHtml(data.title)}</div>
+            <div style="margin-bottom:16px"><span style="color:#ff4500;font-weight:600">${escapeHtml(data.subreddit)}</span></div>
+            <div class="detail-section"><h4>Preview</h4><div class="detail-description">${escapeHtml(data.desc) || 'Click "Open on Reddit" to read the full post.'}</div></div>`;
+        actionsHtml = [
+            actionLink(data.link, 'Open on Reddit', 'action-primary', '👽'),
+            actionLink(searchUrl('site:reddit.com '+data.title), 'Search', 'action-secondary', '🔍')
+        ].join('');
+    }
+    else if (type === 'gossip') {
+        bodyHtml = `
+            <div class="detail-title" id="detailTitleText">${data.emoji} ${escapeHtml(data.headline)}</div>
+            <div style="margin-bottom:16px"><span style="color:#e040fb;font-weight:600">${escapeHtml(data.source)}</span></div>
+            <div class="detail-section"><h4>The Scoop</h4><div class="detail-description">${escapeHtml(data.desc)}</div></div>`;
+        actionsHtml = [
+            actionLink(data.link, 'Read Source', 'action-primary', '📰'),
+            actionLink(searchUrl(data.headline), 'Search', 'action-secondary', '🔍')
+        ].join('');
+    }
+    else if (type === 'weather') {
+        bodyHtml = `
+            <div class="detail-title" id="detailTitleText">${data.emoji} ${escapeHtml(data.city)} Weather</div>
+            <div class="detail-stats">
+                <div class="detail-stat"><div class="stat-label">Temperature</div><div class="stat-value">${data.temp}</div></div>
+                <div class="detail-stat"><div class="stat-label">Condition</div><div class="stat-value">${escapeHtml(data.condition)}</div></div>
+                <div class="detail-stat"><div class="stat-label">High / Low</div><div class="stat-value">${data.high} / ${data.low}</div></div>
+                <div class="detail-stat"><div class="stat-label">Humidity</div><div class="stat-value">${data.humidity || 'N/A'}</div></div>
+                <div class="detail-stat"><div class="stat-label">Wind</div><div class="stat-value">${data.wind || 'N/A'}</div></div>
+            </div>
+            ${data.forecast && data.forecast.length ? `
+            <div class="detail-section"><h4>5-Day Forecast</h4>
+                <div class="forecast-row">${data.forecast.map(f => `<div class="forecast-day">
+                    <div class="fc-day">${f.day}</div><div class="fc-emoji">${f.emoji}</div>
+                    <div class="fc-temp">${f.hi}°</div><div style="color:#666;font-size:0.7rem">${f.lo}°</div>
+                </div>`).join('')}</div>
+            </div>` : ''}`;
+        actionsHtml = [
+            actionLink(searchUrl(data.city+' weather today'), 'Full Forecast', 'action-primary', '🔍'),
+            actionLink(searchUrl(data.city+' weather radar'), 'Radar', 'action-secondary', '🛰️')
+        ].join('');
+    }
+    else if (type === 'sports') {
+        bodyHtml = `
+            <div class="detail-title" id="detailTitleText">${data.emoji} ${escapeHtml(data.headline)}</div>
+            <div style="margin-bottom:16px"><span style="color:#76ff03;font-weight:600">${escapeHtml(data.league)}</span></div>
+            <div class="detail-section"><h4>Details</h4><div class="detail-description">${escapeHtml(data.desc) || 'Click to read the full story.'}</div></div>`;
+        actionsHtml = [
+            actionLink(data.link, 'Read Source', 'action-primary', '📰'),
+            actionLink(searchUrl(data.headline), 'Search', 'action-secondary', '🔍'),
+            actionLink(searchUrl(data.league+' scores today'), `${data.league} Scores`, 'action-secondary', '🏆')
+        ].join('');
+    }
+    else if (type === 'custom') {
+        bodyHtml = `<div class="detail-title" id="detailTitleText">Custom Item</div><div class="detail-description">${escapeHtml(data.content||data.label||data.url||'')}</div>`;
+        actionsHtml = actionLink(data.url, 'Open', 'action-primary', '🔗');
+    }
+
+    document.getElementById('detailBody').innerHTML = bodyHtml;
+    document.getElementById('detailActions').innerHTML = actionsHtml;
+    lastFocusedElement = document.activeElement;
+    const overlay = document.getElementById('detailOverlay');
+    overlay.classList.add('open');
+    overlay.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('modal-open');
+    requestAnimationFrame(() => document.getElementById('detailClose').focus());
+}
+
+function closeDetail() {
+    const overlay = document.getElementById('detailOverlay');
+    overlay.classList.remove('open');
+    overlay.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('modal-open');
+    if (lastFocusedElement && document.contains(lastFocusedElement)) lastFocusedElement.focus();
+}
+
+document.getElementById('detailClose').addEventListener('click', closeDetail);
+document.getElementById('detailBackdrop').addEventListener('click', closeDetail);
+document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    if (document.getElementById('detailOverlay').classList.contains('open')) closeDetail();
+    else if (document.getElementById('configOverlay').classList.contains('open')) closeConfig();
+});
+
+// Robust click detection on moving ticker items
+// Track pointer start position; if it hasn't moved much by release, treat as click
+let ptrDown = null;
+const CLICK_THRESHOLD = 10; // pixels
+
+document.getElementById('tickerContainer').addEventListener('pointerdown', e => {
+    ptrDown = { x: e.clientX, y: e.clientY, target: e.target, time: Date.now() };
+    // Force-pause the lane immediately so the item stops moving
+    const lane = e.target.closest('.ticker-lane');
+    if (lane) lane.classList.add('force-paused');
+});
+
+document.getElementById('tickerContainer').addEventListener('pointerup', e => {
+    if (!ptrDown) return;
+    const dx = Math.abs(e.clientX - ptrDown.x);
+    const dy = Math.abs(e.clientY - ptrDown.y);
+    const dt = Date.now() - ptrDown.time;
+
+    // Remove force-pause
+    document.querySelectorAll('.ticker-lane.force-paused').forEach(l => l.classList.remove('force-paused'));
+
+    // If pointer barely moved and was quick, treat as click
+    if (dx < CLICK_THRESHOLD && dy < CLICK_THRESHOLD && dt < 1000) {
+        const item = ptrDown.target.closest('.ticker-item');
+        if (item) {
+            const type = item.dataset.type, idx = parseInt(item.dataset.idx);
+            if (type && !isNaN(idx)) openDetail(type, idx);
+        }
+    }
+    ptrDown = null;
+});
+
+// Also handle pointerleave to clean up force-pause
+document.getElementById('tickerContainer').addEventListener('pointerleave', () => {
+    ptrDown = null;
+    document.querySelectorAll('.ticker-lane.force-paused').forEach(l => l.classList.remove('force-paused'));
+});
+document.getElementById('tickerContainer').addEventListener('pointercancel', () => {
+    ptrDown = null;
+    document.querySelectorAll('.ticker-lane.force-paused').forEach(l => l.classList.remove('force-paused'));
+});
+document.getElementById('tickerContainer').addEventListener('click', e => {
+    // Keyboard activation of a native ticker button has click detail 0.
+    if (e.detail !== 0) return;
+    const item = e.target.closest('.ticker-item');
+    if (item) openDetail(item.dataset.type, Number(item.dataset.idx));
+});
+
+// ═══════════════════════════════════════
+// CONFIG PANEL
+// ═══════════════════════════════════════
+
+function openConfig() {
+    lastConfigFocusedElement = document.activeElement;
+    const overlay = document.getElementById('configOverlay');
+    overlay.classList.add('open');
+    overlay.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('modal-open');
+    document.querySelectorAll('.config-panel input[data-lane]').forEach(el => { el.checked = laneConfig[el.dataset.lane] ?? true; });
+    document.getElementById('cfgLiveData').checked = liveDataEnabled;
+    document.getElementById('cfgFinnhubKey').value = finnhubKey;
+    document.getElementById('cfgDirection').value = direction;
+    document.getElementById('cfgDensity').value = density;
+    customDraft = customItems.map(item => ({ ...item }));
+    renderCustomItemsList();
+    requestAnimationFrame(() => document.getElementById('cfgLiveData').focus());
+}
+function closeConfig() {
+    const overlay = document.getElementById('configOverlay');
+    overlay.classList.remove('open');
+    overlay.setAttribute('aria-hidden', 'true');
+    customDraft = [];
+    if (!document.getElementById('detailOverlay').classList.contains('open')) document.body.classList.remove('modal-open');
+    if (lastConfigFocusedElement && document.contains(lastConfigFocusedElement)) lastConfigFocusedElement.focus();
+}
+function saveConfig() {
+    document.querySelectorAll('.config-panel input[data-lane]').forEach(el => { laneConfig[el.dataset.lane] = el.checked; });
+    liveDataEnabled = document.getElementById('cfgLiveData').checked;
+    finnhubKey = document.getElementById('cfgFinnhubKey').value.trim();
+    direction = document.getElementById('cfgDirection').value;
+    density = document.getElementById('cfgDensity').value;
+    customItems = customDraft.map(item => ({ ...item }));
+    localStorage.setItem('tickerLaneConfig', JSON.stringify(laneConfig));
+    localStorage.setItem('tickerCustomItems', JSON.stringify(customItems));
+    localStorage.setItem('tickerLiveData', liveDataEnabled ? 'true' : 'false');
+    localStorage.setItem('tickerFinnhubKey', finnhubKey);
+    localStorage.setItem('tickerDirection', direction);
+    localStorage.setItem('tickerDensity', density);
+    closeConfig();
+    renderAllLanes();
+    // Re-fetch all live data
+    initLiveData();
+}
+function renderCustomItemsList() {
+    const list = document.getElementById('customItemsList');
+    list.innerHTML = customDraft.map((item, i) => `
+        <div class="custom-item-entry">
+            <select onchange="customDraft[${i}].type=this.value;renderCustomItemsList()">
+                <option value="text" ${item.type==='text'?'selected':''}>Text</option>
+                <option value="image" ${item.type==='image'?'selected':''}>Image URL</option>
+                <option value="link" ${item.type==='link'?'selected':''}>Website</option>
+            </select>
+            ${item.type === 'text'
+                ? `<input type="text" value="${escapeHtml(item.content||'')}" placeholder="Your text..." onchange="customDraft[${i}].content=this.value">`
+                : `<input type="url" value="${escapeHtml(item.url||'')}" placeholder="${item.type==='image'?'Image URL...':'Website URL...'}" onchange="customDraft[${i}].url=this.value">
+                   <input type="text" value="${escapeHtml(item.label||'')}" placeholder="Label..." onchange="customDraft[${i}].label=this.value" style="max-width:100px">`
+            }
+            <button class="btn-remove" aria-label="Remove custom item" onclick="customDraft.splice(${i},1);renderCustomItemsList()">✕</button>
+        </div>
+    `).join('');
+}
+function addCustomItem() { customDraft.push({ type: 'text', content: '' }); renderCustomItemsList(); }
+
+// ═══════════════════════════════════════
+// EVENT LISTENERS
+// ═══════════════════════════════════════
+
+document.getElementById('btnConfig').addEventListener('click', openConfig);
+document.getElementById('btnCancelConfig').addEventListener('click', closeConfig);
+document.getElementById('btnSaveConfig').addEventListener('click', saveConfig);
+document.getElementById('btnAddCustom').addEventListener('click', addCustomItem);
+document.getElementById('speedSlider').addEventListener('input', event => {
+    motionSpeed = Number(event.target.value);
+    localStorage.setItem('tickerMotionSpeed', String(motionSpeed));
+    renderAllLanes();
+});
+document.getElementById('configOverlay').addEventListener('click', e => { if (e.target === e.currentTarget) closeConfig(); });
+
+document.getElementById('btnPause').addEventListener('click', () => {
+    isPaused = !isPaused;
+    applyMotionState();
+});
+document.getElementById('btnView').addEventListener('click', () => {
+    viewMode = viewMode === 'compact' ? 'lanes' : 'compact';
+    localStorage.setItem('tickerViewMode', viewMode);
+    renderAllLanes();
+});
+document.getElementById('btnRefresh').addEventListener('click', () => {
+    if (liveDataEnabled) Object.keys(feedStatus).forEach(name => { feedStatus[name] = 'pending'; });
+    updateFeedStatus();
+    initLiveData();
+});
+
+function updateClock() { document.getElementById('statusTime').textContent = new Date().toLocaleString(); }
+setInterval(updateClock, 1000);
+updateClock();
+
+// ═══════════════════════════════════════
+// INITIALIZATION & REFRESH TIMERS
+// ═══════════════════════════════════════
+
+let refreshTimers = {};
+
+function initLiveData() {
+    // Clear old timers
+    Object.values(refreshTimers).forEach(clearInterval);
+    refreshTimers = {};
+
+    if (!liveDataEnabled) {
+        const dataByFeed = { stocks:stocksData, crypto:cryptoData, news:newsData, reddit:redditData, weather:weatherData, gossip:gossipData, sports:sportsData };
+        Object.keys(feedStatus).forEach(name => {
+            feedStatus[name] = dataByFeed[name].some(item => item.isCached) ? 'cached' : 'err';
+        });
+        if (cryptoWs) { cryptoWs.close(); cryptoWs = null; }
+        updateFeedStatus();
+        return;
+    }
+
+    // Initial fetches (staggered to avoid rate limits)
+    fetchCrypto();
+    refreshTimers.startWeather = setTimeout(fetchWeather, 500);
+    refreshTimers.startNews = setTimeout(fetchNews, 1000);
+    refreshTimers.startReddit = setTimeout(fetchReddit, 1500);
+    refreshTimers.startGossip = setTimeout(fetchGossip, 2000);
+    refreshTimers.startSports = setTimeout(fetchSports, 2500);
+    refreshTimers.startStocks = setTimeout(fetchStocks, 3000);
+
+    // Refresh intervals
+    refreshTimers.stocks  = setInterval(fetchStocks, 15000);   // 15s
+    refreshTimers.crypto  = setInterval(fetchCrypto, 60000);   // 60s (WebSocket handles real-time)
+    refreshTimers.news    = setInterval(fetchNews, 600000);    // 10 min
+    refreshTimers.reddit  = setInterval(fetchReddit, 300000);  // 5 min
+    refreshTimers.weather = setInterval(fetchWeather, 1800000);// 30 min
+    refreshTimers.gossip  = setInterval(fetchGossip, 600000);  // 10 min
+    refreshTimers.sports  = setInterval(fetchSports, 300000);  // 5 min
+}
+
+// Restore the last good local state, show it immediately, then refresh.
+restoreCachedFeeds();
+document.getElementById('speedSlider').value = String(motionSpeed);
+renderAllLanes();
+updateFeedStatus();
+initLiveData();
+
+</script>
+</body>
+</html>
